@@ -13,7 +13,6 @@ Then to use this in a card place the following in your entity card:
       title: Sunroom
       show_header_toggle: false
       entities:
-        - switch.sunroom_light
         - entity: fan.sunroom_fan
           type: custom:fan-control-entity-row
           name: Sunroom Fan    
