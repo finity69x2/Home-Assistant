@@ -2,7 +2,7 @@ Place the following in your "resources" section in your lovelace configuration:
 
   ```
     - url: /local/lovelace/fan-control-entity-row.js
-    type: js
+      type: js
   ```
     
 Then to use this in a card place the following in your entity card:
