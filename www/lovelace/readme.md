@@ -6,10 +6,30 @@ Place the following in your "resources" section in your lovelace configuration:
   ```
     
 Then to use this in a card place the following in your entity card:
+
+
+<b>Options:</b>
+
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| entity | String | Yes | none | a fan entity_id |
+| type | String | Yes | none | custom:fan-control-entity-row |
+| name | String | No | none | A custom name for the entity in the row |
+| customTheme | Boolean | No | false | set to true to use a custom theme |
+| customIsOffColor | String | No | '#f44c09' | Sets the color of the 'Off' button if fan is off |
+| customIsOnLowColor | String | No | '#43A047' | Sets the color of the 'Low' button if fan is on low |
+| customIsOnMedColor | String | No | '#43A047' | Sets the color of the 'Med' button if fan is on Medium |
+| customIsOnHiColor | String | No | '#43A047' | Sets the color of the 'Hi' button if fan is on high |
+| customIsOffSpdColor | String | No | '#759aaa' | Sets the color of the the buttons if that selection is off |
+
+
+The values for the colors can be any valid color string in "HEX", "RGB" or by color name.
+
+<b>Comfguration Examples:</b>
     
   ```
-  cards:
-    - type: entities
+    cards:
+      - type: entities
         title: Fans
         show_header_toggle: false
         entities:
