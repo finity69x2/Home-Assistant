@@ -37,5 +37,11 @@ Then to use this in a card place the following in your entity card:
 
 This is with the default Lovelace frontend theme set:
 
+https://github.com/finity69x2/Home-Assistant/blob/master/www/lovelace/default_fan_ex.gif
+
 
 This is with the "Slate" frontend theme set:
+
+https://github.com/finity69x2/Home-Assistant/blob/master/www/lovelace/slate_fan_ex.gif
+
+
