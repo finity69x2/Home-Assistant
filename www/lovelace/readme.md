@@ -1,7 +1,9 @@
-Place the following in your "resources" section in your lovelace configuration:
+Copy the fan-control-entity-row.js file to the appropriate folder in your Home Assistant Configuration directory (/config/www/).
+
+Place the following in your "resources" section in your lovelace configuration (updating the localation to where you placed the above file):
 
   ```
-    - url: /local/lovelace/fan-control-entity-row.js
+    - url: /local/fan-control-entity-row.js
       type: js
   ```
     
