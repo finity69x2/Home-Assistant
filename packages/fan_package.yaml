@@ -1,3 +1,7 @@
+## NOTE: it seems that in later versions of Tasmota the iFan02 configuration uses a different state topic 
+## than the original as listed below.
+## The new topic for both state_topic and speed_topic is "stat/sonoff_MBR_fan/FANSPEED"
+
 fan:
   - platform: mqtt  
     name: "Master Bedroom Fan"
