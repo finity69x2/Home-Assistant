@@ -4,8 +4,7 @@ fan:
     command_topic: "cmnd/sonoff_MBR_fan/FanSpeed"
     speed_command_topic: "cmnd/sonoff_MBR_fan/FanSpeed"    
     state_topic: "stat/sonoff_MBR_fan/RESULT"
-    speed_state_topic: "stat/sonoff_MBR_fan/RESULT"
-    #state_value_template: "{% if value_json.FanSpeed == 0 -%}0{%- elif value_json.FanSpeed > 0 -%}4{%- endif %}"
+    speed_state_topic: "stat/sonoff_MBR_fan/RESULT
     state_value_template: >
       {% if value_json.FanSpeed is defined %}
         {% if value_json.FanSpeed == 0 -%}0{%- elif value_json.FanSpeed > 0 -%}4{%- endif %}
@@ -13,7 +12,6 @@ fan:
         {% if states.fan.master_bedroom_fan.state == 'off' -%}0{%- elif states.fan.master_bedroom_fan.state == 'on' -%}4{%- endif %}
       {% endif %}
     speed_value_template: "{{ value_json.FanSpeed }}"
-    #speed_value_template: "{% if value_json.FanSpeed == 0 -%}off{%- elif value_json.FanSpeed > 0 -%}{{ value_json.FanSpeed }}{%- endif %}"
     availability_topic: tele/sonoff_MBR_fan/LWT
     payload_off: "0"
     payload_on: "4"
