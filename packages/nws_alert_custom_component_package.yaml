@@ -145,6 +145,7 @@ automation:
             - media_player.kitchen_dot
             - media_player.livingroom_dot
             - media_player.master_bedroom_dot
+            - media_player.garage_dot
           volume_level: 0.9
       - service: notify.alexa_media
         data_template:
