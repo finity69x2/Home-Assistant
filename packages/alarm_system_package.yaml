@@ -1,0 +1,322 @@
+#################################################################################
+#
+#   This is the package for ALARM SYSTEM
+#
+#################################################################################
+
+
+########################  GROUPS  ###############################################
+
+group:
+  motion_house:
+    name: Motion - House Only
+    view: no
+    icon: mdi:walk
+    entities:
+      - sensor.computer_room_camera_motion
+      - sensor.livingroom_camera_motion
+      - sensor.kitchen_camera_motion
+      - sensor.diningroom_camera_motion
+      - binary_sensor.comp_rm_motion_template
+      - binary_sensor.gs5_webcam_motion_template
+      - binary_sensor.gs42_webcam_motion_template
+
+########################  INPUT BOOLEAN  ########################################
+
+input_boolean:
+  bool_6:
+    name: Alarm Set
+    #initial: off
+    
+  bool_7:
+    name: Alarm System Test
+    initial: off
+
+########################  SENSORS  ##############################################
+
+sensor:
+  - platform: template
+    sensors:
+      val_random_hour:
+        friendly_name: Random Hour Value
+        entity_id: sensor.random_hour
+        value_template: >
+          {% if states.sensor.random_hour.state|int < 10  %}
+            0{{states.sensor.random_hour.state}}
+          {% else %}
+            {{states.sensor.random_hour.state}}
+          {% endif %}
+      val_random_minute:
+        friendly_name: Random Minute Value
+        entity_id: sensor.random_minute
+        value_template: >
+          {% if states.sensor.random_minute.state|int < 10  %}
+            0{{states.sensor.random_minute.state}}
+          {% else %}
+            {{states.sensor.random_minute.state}}
+          {% endif %}
+  
+
+  - platform: random
+    name: Random Hour
+    minimum: 0
+    maximum: 23
+  
+  - platform: random
+    name: Random Minute
+    minimum: 0
+    maximum: 59    
+  
+########################  AUTOMATION  ###########################################
+
+automation:
+  - alias: AS Trespass Warning
+    initial_state: 'on'
+    trigger:
+      - platform: state
+        entity_id: input_boolean.bool_7
+        to: 'on'
+      - platform: state
+        entity_id: group.motion_house
+        to: 'on'
+      ## kitchen door
+      - platform: state
+        entity_id: binary_sensor.door_window_sensor_1_sensor
+        to: 'on'
+      ## main bath window
+      - platform: state
+        entity_id: binary_sensor.door_window_sensor_2_sensor
+        to: 'on'
+      ## sunroom door
+      - platform: state
+        entity_id: binary_sensor.door_window_sensor_3_sensor
+        to: 'on'
+      ## foyer door
+      - platform: state
+        entity_id: binary_sensor.door_window_sensor_4_sensor
+        to: 'on'
+      - platform: state
+        entity_id: binary_sensor.comp_rm_motion_template
+        to: 'on'
+      - platform: state
+        entity_id: sensor.sunroom_east_pe_beam
+        to: 'OFF'
+    condition:
+      condition: and
+      conditions:
+        - condition: state
+          entity_id: input_boolean.bool_6
+          state: 'on'
+        - condition: state
+          entity_id: group.all_devices
+          state: 'not_home'
+    action:
+      - service: camera.snapshot
+        data:
+          entity_id: camera.deck
+          filename: '/config/www/snapshots/deck_alarm_1.jpg'
+      - delay: '00:00:05'
+      - service: camera.snapshot
+        data_template: 
+          entity_id: >
+            {% set mapper = {
+              'binary_sensor.door_window_sensor_1_sensor':'camera.kitchen',
+              'binary_sensor.door_window_sensor_2_sensor':'camera.dummy',
+              'binary_sensor.door_window_sensor_3_sensor':'camera.dining_room',
+              'binary_sensor.door_window_sensor_4_sensor':'camera.living_room',
+              'binary_sensor.comp_rm_motion_template':'camera.computer_room',
+              'input_boolean.bool_7':'camera.dummy',
+              'sensor.sunroom_east_pe_beam':'camera.dining_room' } %}
+            {{ mapper[trigger.entity_id] }}
+          filename: >
+            {% set mapper = {
+              'binary_sensor.door_window_sensor_1_sensor':'/config/www/snapshots/kitchen_alarm_1.jpg',
+              'binary_sensor.door_window_sensor_2_sensor':'/config/www/snapshots/dummy_alarm_1.jpg',
+              'binary_sensor.door_window_sensor_3_sensor':'/config/www/snapshots/diningroom_alarm_1.jpg',
+              'binary_sensor.door_window_sensor_4_sensor':'/config/www/snapshots/livingroom_alarm_1.jpg',
+              'binary_sensor.comp_rm_motion_template':'/config/www/snapshots/computer_room_alarm_1.jpg',
+              'input_boolean.bool_7':'/config/www/snapshots/dummy_alarm_1.jpg',
+              'sensor.sunroom_east_pe_beam':'/config/www/snapshots/diningroom_pe_alarm_1.jpg' } %}
+            {{ mapper[trigger.entity_id] }}
+      - service: script.as_burglar_alarm
+        data_template:
+          triggered_by: '{{ trigger.to_state.attributes.friendly_name }}'
+      - delay: '00:00:05'
+      - service: notify.pushbullet_notify
+        data_template:
+          message: 'Warning - Trespass alarm has been triggered by the {{ trigger.to_state.attributes.friendly_name }}!'
+          data:
+            file: '/config/www/snapshots/deck_alarm_1.jpg'
+      - service: notify.pushbullet_notify
+        data_template:
+          message: 'Warning - Trespass alarm has been triggered by the {{ trigger.to_state.attributes.friendly_name }}!'
+          data:
+            file: >
+              {% set mapper = {
+                'binary_sensor.door_window_sensor_1_sensor':'/config/www/snapshots/kitchen_alarm_1.jpg',
+                'binary_sensor.door_window_sensor_2_sensor':'/config/www/snapshots/dummy_alarm_1.jpg',
+                'binary_sensor.door_window_sensor_3_sensor':'/config/www/snapshots/diningroom_alarm_1.jpg',
+                'binary_sensor.door_window_sensor_4_sensor':'/config/www/snapshots/livingroom_alarm_1.jpg',
+                'binary_sensor.comp_rm_motion_template':'/config/www/snapshots/computer_room_alarm_1.jpg',
+                'input_boolean.bool_7':'/config/www/snapshots/dummy_alarm_1.jpg',
+                'sensor.sunroom_east_pe_beam':'/config/www/snapshots/diningroom_pe_alarm_1.jpg' } %}
+              {{ mapper[trigger.entity_id] }}
+                       
+        
+  # Update Last Motion variable
+  - alias: 'AS Update Last Motion'
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id:
+        - sensor.computer_room_camera_motion
+        - sensor.livingroom_camera_motion
+        - sensor.diningroom_camera_motion
+        - sensor.garage_camera_motion
+        - sensor.kitchen_camera_motion
+        - sensor.deck_camera_motion
+        - binary_sensor.comp_rm_motion_template
+      to: 'on'
+    action:
+      service: variable.set_variable
+      data:
+        variable: last_motion
+        attributes_template: >
+          {
+            "history_1": "{{ variable.state }}",
+            "history_2": "{{ variable.attributes.history_1 }}",
+            "history_3": "{{ variable.attributes.history_2 }}",
+            "history_4": "{{ variable.attributes.history_3 }}",
+            "history_5": "{{ variable.attributes.history_4 }}",
+            "history_6": "{{ variable.attributes.history_5 }}",
+            "history_7": "{{ variable.attributes.history_6 }}",
+            "history_8": "{{ variable.attributes.history_7 }}",
+            "history_9": "{{ variable.attributes.history_8 }}",
+            "history_10": "{{ variable.attributes.history_9 }}"
+          }
+      data_template:
+        value: >
+          {{ trigger.to_state.attributes.friendly_name|replace('motion sensor','') }}:
+          {{as_timestamp(states.variable.last_motion.last_changed)| timestamp_custom('%X') }}
+
+  - alias: AS Reset Computer Cam Motion Detection
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id: switch.foscam_computer_cam_motion
+      to: 'Disabled'
+    action:
+      service: script.turn_on
+      entity_id: script.as_reset_computer_cam_motion
+      
+  - alias: AS Computer Cam Position Control
+    initial_state: 'on'
+    trigger:
+      - platform: state
+        entity_id: device_tracker.galaxys8
+    action:
+      service_template: >
+        {% if trigger.to_state.state == 'home' %}
+          shell_command.comp_cam_top_pos
+        {% elif trigger.to_state.state == 'not_home' %}
+          shell_command.comp_cam_record_pos
+        {% endif %}
+
+          
+########################   VARIABLE    ##########################################
+
+variable:
+  last_motion:
+    value: 'Not set'
+    restore: true
+    attributes:
+      icon: mdi:map-marker
+      name: 'Last Motion'
+
+########################   SCRIPT  ##############################################
+          
+script:
+  as_burglar_alarm:
+    sequence:
+      - service: media_player.turn_on
+        entity_id: media_player.chromecastaudio1984
+      - service: media_player.volume_set
+        entity_id:
+          - media_player.chromecastaudio1984
+        data_template:
+          volume_level: >
+            {% if now().strftime("%H")|int < 12 and now().strftime("%H")|int > 6 %}
+            0.7
+            {% elif now().strftime("%H")|int > 12 and now().strftime("%H")|int < 17 %}
+            0.7
+            {% else %}
+            0.7
+            {% endif %}
+      - service: homeassistant.turn_on
+        entity_id: group.alexa_all_lights
+      - service: media_player.volume_set
+        data:
+          entity_id:
+            - media_player.computer_room_dot
+            - media_player.kitchen_dot
+            - media_player.livingroom_dot
+            - media_player.master_bedroom_dot
+            - media_player.garage_dot
+            - media_player.big_room_dot
+          volume_level: 0.5
+      - service: notify.alexa_media
+        data_template:
+          target: 
+            - media_player.computer_room_dot
+            - media_player.kitchen_dot
+            - media_player.livingroom_dot
+            - media_player.master_bedroom_dot
+            - media_player.garage_dot
+            - media_player.big_room_dot
+          data:
+            type: announce 
+          message: "The alarm system has been triggered by the {{ triggered_by }}. The alarm system has been triggered by the {{ triggered_by }}."
+      - service: media_player.play_media
+        data_template:
+          entity_id: media_player.chromecastaudio1984
+          media_content_id: "https://www.dropbox.com/s/xzylqb3srto87t5/trespass_warning.mp3?dl=0&raw=1"
+          media_content_type: audio/mp4
+      #- service: media_player.turn_off
+      #  entity_id: media_player.chromecastaudio1984
+      
+  as_reset_computer_cam_motion:
+    alias: Reset Computer Room Camera Motion
+    sequence:
+      - delay: '00:00:10'
+      - service: switch.turn_off
+        entity_id: switch.foscam_computer_cam_motion
+      - delay: '00:00:10'
+      - service: switch.turn_on
+        entity_id: switch.foscam_computer_cam_motion
+        
+#############################
+
+## the scripts below are only used for testing purposes and aren't used in the system
+      
+  as_living_room_snapshot:
+    alias: 'Living Room Snapshot'
+    sequence:
+      - service: notify.alexa_media
+        data:
+          target: media_player.computer_room_dot
+          data:
+            type: announce 
+          message: "The alarm system has been triggered. The alarm system has been triggered."
+      - service: camera.snapshot
+        data:
+          entity_id: camera.living_room
+          #filename: '/config/www/snapshots/livingroom_{{ now().year }}_{{ now().month }}_{{ now().day }}_{{ now().hour }}_{{ now().minute }}.jpg'
+          filename: '/config/www/snapshots/livingroom_snap.jpg'
+      - delay: '00:00:05'
+      - service: notify.pushbullet_notify
+        data: 
+          data:
+            #file: '/config/www/snapshots/livingroom_{{ now().year }}_{{ now().month }}_{{ now().day }}_{{ now().hour }}_{{ now().minute }}.jpg'
+            file: '/config/www/snapshots/livingroom_snap.jpg'
+          title: "Living Room Snapshot Taken"
+          message: "A snapshot has been taken in the livingroom"
