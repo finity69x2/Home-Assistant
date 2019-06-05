@@ -2,6 +2,8 @@
 ## than the original as listed below.
 ## The new topic for both state_topic and speed_topic is "stat/sonoff_MBR_fan/FANSPEED"
 
+## iFan02 flashed with Tasmota:
+
 fan:
   - platform: mqtt  
     name: "Master Bedroom Fan"
@@ -31,6 +33,9 @@ fan:
       - high
       
 #### The above is all you need to get a Sonoff iFan02 flashed with Tasmota working with the fan-control-entity-row.js component ####
+
+#### if you want to use the ESPHome flashed on the iFan02:
+#### https://github.com/esphome/esphome-docs/pull/218
 
 #### the rest of this is for using a Broadlink RF controller to control a dumb fan.                                             ####
 #### You will need to add your details in the config below as necessary (names, rf codes, etc)                                  ####
