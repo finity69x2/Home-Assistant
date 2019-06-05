@@ -36,6 +36,7 @@ fan:
 
 #### if you want to use the ESPHome flashed on the iFan02:
 #### https://github.com/esphome/esphome-docs/pull/218
+#### https://gist.github.com/quazzie/09ee3ef2c419ecbcf979a7410062481b
 
 #### the rest of this is for using a Broadlink RF controller to control a dumb fan.                                             ####
 #### You will need to add your details in the config below as necessary (names, rf codes, etc)                                  ####
