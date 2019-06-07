@@ -1,0 +1,136 @@
+This Procedure was distilled down from the thread here:
+
+https://community.home-assistant.io/t/python-3-6-upgrade-of-a-virtualenv/21722
+
+and it generally worked for me using Hassbian 1.2 in March 2018
+
+##########
+
+#Upgrade to Debian Stretch (9) if you haven't already (Optional)
+
+$ sudo apt-get update
+$ sudo apt-get upgrade
+$ sudo apt-get dist-upgrade
+$ sudo sed -i 's/jessie/stretch/g' /etc/apt/sources.list
+$ sudo apt-get update
+$ sudo apt-get upgrade
+$ sudo apt-get dist-upgrade
+$ sudo reboot
+
+--
+
+#Update Python dependencies
+
+$ sudo apt-get install build-essential tk-dev libncurses5-dev libncursesw5-dev libreadline6-dev libdb5.3-dev libgdbm-dev libsqlite3-dev libssl-dev libbz2-dev libexpat1-dev liblzma-dev zlib1g-dev
+
+--
+
+#Download and install latest python
+
+$ cd /home/pi
+$ wget https://www.python.org/ftp/python/3.6.3/Python-3.6.3.tgz
+$ tar xzvf Python-3.6.3.tgz
+$ cd Python-3.6.3/
+$ ./configure
+$ make
+$ sudo make install
+
+#After the above you should have python 2.7, python 3.4 and python 3.6 installed.
+
+--
+
+#re-activate the current home assistant virtual environment (might not have been de-activated yet…)
+
+$ cd /srv/homeassistant
+
+$ sudo su -s /bin/bash homeassistant 
+$ source /srv/homeassistant/bin/activate
+
+#with the home assistant virtual environment active and from the home assistant home directory
+
+$ cd /home/homeassistant
+$ pip3 freeze —local > requirements.txt
+
+#This generates a file with the versions of all the packages you have installed. It can be used later to re-install all those packages.
+#Check this file and make sure it looks ok
+#deactivate the ha virtual environment
+
+$ deactivate
+
+--
+
+#Delete old virtual environment
+
+$ cd /srv/
+$ sudo rm -r *
+
+--
+
+#Create new virtual environment with latest python
+
+$ cd /srv/
+$ sudo mkdir homeassistant
+$ sudo chown homeassistant:homeassistant homeassistant
+$ sudo su -s /bin/bash homeassistant
+$ cd /srv/homeassistant
+$ python3.6 -m venv .
+$ source bin/activate
+
+--
+
+#Install latest Hass
+
+$ pip3 install homeassistant
+$ hass
+
+--
+
+#with the new virtual environment active do the following checks.
+
+$ python --version
+$ python3 --version
+$ pip3 --version
+
+#all three should indicate python3.6
+
+--
+
+#go to the home assistant home directory
+
+$ cd /home/homeassistant
+
+#Now we use the requirements.txt file we captured earlier.
+
+$ pip3 install -r requirements.txt
+
+#This should install all the packages that were installed in the old virtual environment.
+#The openzwave items gave me a problem installing. I commented out the following items. Try installing with them in, you may have better luck than me.
+
+#libopenzwave==0.3.2 
+#openzwave==0.3.2
+#pyozwman==0.3.2
+#pyozwweb==0.3.2
+
+#If it fails on any of these, just comment it out, and run the pip3 install -r requirements.txt again. It will try to re-install the ones it has already done, but it doesn’t do any harm.
+#It may take a few attempts commenting out the openzwave items to get through, but eventually the package collection will finish and installation will start.
+
+$ sudo reboot
+
+--
+
+#my browser came up but i had invalid components for zwave, discovery and zeroconf so I’m going to try installing them manually
+
+$ pip3 install zeroconf
+
+#this seems to have taken care of discovery too.
+
+--
+
+#z-wave gave me a problem. So, with the virtualenv active
+
+$ sudo apt-get install libudev-dev
+
+#then
+
+$ pip3 install python_openzwave
+$ sudo reboot
