@@ -1,0 +1,227 @@
+## you will end up with three (3) files in your esphome directory:
+##
+## ifan02_test.yaml (or whatever filename you want)
+## common_sonoff_ifan02.yaml
+## ifan02.h
+##
+## This also assumes you have a secrets file or at least know how to use one.
+
+#################################################################
+
+## this is the device specific yaml file. put all of the device specific configuration in here. 
+## it will get tranferrred to the firmware file at compile time.
+
+## ifan02_test.yaml (call this file whatever you want):
+
+substitutions:
+  name: ifan02_test
+  ip: 192.168.1.60
+  friendly_name: iFan02 Test
+  friendly_name_light: iFan02 Test Light
+  friendly_name_fan: iFan02 Test Fan
+<<: !include common_sonoff_ifan02.yaml
+
+################################################################
+
+## This is the device common file that will be used for all of the iFan02 devices
+
+## common_sonoff_ifan02.yaml:
+
+esphome:
+  name: ${name}
+  platform: ESP8266
+  board: esp8285
+  includes:
+    - ifan02.h
+    
+wifi:
+  #hostname: ${name}
+  ssid: !secret wifi_ssid
+  password: !secret wifi_pwd
+  #reboot_timeout: 0s
+  fast_connect: true
+  manual_ip:
+    static_ip: ${ip}
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+    
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  #password: !secret esphome_api_pwd
+  reboot_timeout: 0s
+
+ota:
+  #password: !secret esphome_ota_pwd
+
+binary_sensor:
+  - platform: gpio
+    id: vbutton_light
+    pin: 
+      number: GPIO0
+      inverted: True
+    on_press:
+      then:
+        - light.toggle: lamp
+
+  - platform: gpio
+    id: vbutton_relay_1
+    pin: 
+      number: GPIO9
+      inverted: True
+    on_press:
+      then:
+        - switch.toggle: fan_relay1
+        - switch.turn_on: update_fan_speed
+
+  - platform: gpio
+    id: vbutton_relay_2
+    pin: 
+      number: GPIO10
+      inverted: True
+    on_press:
+      then:
+        - switch.toggle: fan_relay2
+        - switch.turn_on: update_fan_speed
+        
+  - platform: gpio
+    id: vbutton_relay_3
+    pin: 
+      number: GPIO14
+      inverted: True
+    on_press:
+      then:
+        - switch.toggle: fan_relay3
+        - switch.turn_on: update_fan_speed
+
+output:
+  - platform: custom
+    type: float
+    outputs:
+      id: fanoutput
+    lambda: |-
+      auto ifan02 = new IFan02Output();
+      App.register_component(ifan02);
+      return {ifan02};
+      
+  - platform: gpio
+    pin: GPIO12
+    id: light_output
+
+light:
+  - platform: binary
+    name: ${friendly_name_light}
+    output: light_output
+    id: lamp
+
+switch:
+  - platform: template
+    id: update_fan_speed
+    optimistic: True
+    turn_on_action:
+      then:
+        - delay: 200ms
+        - if: 
+            condition:
+              and:
+                - switch.is_off: fan_relay1
+                - switch.is_off: fan_relay2
+                - switch.is_off: fan_relay3
+            then:
+              - fan.turn_off: ifan02
+        - if:
+            condition:
+              and:
+                - switch.is_on: fan_relay1
+                - switch.is_off: fan_relay2
+                - switch.is_off: fan_relay3
+            then:
+              - fan.turn_on: 
+                  id: ifan02
+                  speed: LOW
+        - if:
+            condition:
+              and:
+                - switch.is_on: fan_relay1
+                - switch.is_on: fan_relay2
+                - switch.is_off: fan_relay3
+            then:
+              - fan.turn_on: 
+                  id: ifan02
+                  speed: MEDIUM
+        - if:
+            condition:
+              and:
+                - switch.is_on: fan_relay1
+                - switch.is_off: fan_relay2
+                - switch.is_on: fan_relay3
+            then:
+              - fan.turn_on: 
+                  id: ifan02
+                  speed: HIGH
+        - switch.turn_off: update_fan_speed
+
+  - platform: gpio
+    pin: GPIO5
+    id: fan_relay1
+    
+  - platform: gpio
+    pin: GPIO4
+    id: fan_relay2
+    
+  - platform: gpio
+    pin: GPIO15
+    id: fan_relay3
+
+fan:
+  - platform: speed
+    output: fanoutput
+    id: ifan02
+    name: ${friendly_name_fan}
+    
+text_sensor:
+  - platform: version
+    name: ${friendly_name} ESPHome Version
+    
+sensor:
+  - platform: wifi_signal
+    name: ${friendly_name} WiFi Signal Strength
+    update_interval: 60s
+    
+############################################################################
+
+## put the following file in the same directory as your esphome yaml files ##
+
+## ifan02.h:
+
+#include "esphome.h"
+using namespace esphome;
+
+class IFan02Output : public Component, public output::FloatOutput {
+  public:
+    void write_state(float state) override {
+        if (state < 0.3) {
+          digitalWrite(5, LOW);
+          digitalWrite(4, LOW);
+          digitalWrite(15, LOW);
+        }
+
+        if (state >= 0.32 && state <= 0.34) {
+          digitalWrite(5, HIGH);
+          digitalWrite(4, LOW);
+          digitalWrite(15, LOW);
+        }
+        if (state >= 0.65 && state <= 0.67) {
+          digitalWrite(5, HIGH);
+          digitalWrite(4, HIGH);
+          digitalWrite(15, LOW);
+        }
+        if (state >= 0.9) {
+          digitalWrite(5, HIGH);
+          digitalWrite(4, LOW);
+          digitalWrite(15, HIGH);
+        }
+    }
+};
