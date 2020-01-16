@@ -2,7 +2,7 @@
 ## than the original as listed below.
 ## The new topic for both state_topic and speed_topic is "stat/sonoff_MBR_fan/FANSPEED"
 
-## iFan02 flashed with Tasmota:
+## iFan02 or iFan03 flashed with Tasmota:
 
 fan:
   - platform: mqtt  
