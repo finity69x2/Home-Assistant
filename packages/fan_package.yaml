@@ -27,7 +27,7 @@ fan:
     payload_available: Online
     payload_not_available: Offline
     speeds:
-      - off
+      - "off"
       - low
       - medium
       - high
@@ -56,7 +56,7 @@ fan:
           data_template:
             speed: "{{ speed }}"
         speeds:
-          - off
+          - "off"
           - low
           - medium
           - high
