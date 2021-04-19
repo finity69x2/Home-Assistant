@@ -1,0 +1,195 @@
+fan:
+
+  - platform: template
+    fans:
+      sunroom_fan_modes_template:
+        friendly_name: "Sunroom Fan Modes Template"
+        value_template: "{{ states('input_boolean.sunroom_fan_state_modes') }}"
+        preset_mode_template: "{{ states('input_select.sunroom_fan_modes') }}"
+        turn_on:
+          service: script.sunroom_fan_on_modes
+        turn_off:
+          service: script.sunroom_fan_off_modes
+        set_preset_mode:
+          service: script.sunroom_fan_set_preset_mode
+          data:
+            preset_mode: "{{ preset_mode }}"
+        preset_modes:
+          - "off"
+          - low
+          - medium
+          - high
+
+input_select:
+  sunroom_fan_modes:
+    name: Sunroom Fan Speed Modes
+    options:
+      - "off"
+      - 'low'
+      - 'medium'
+      - 'high'
+
+input_boolean:
+  sunroom_fan_state_modes:
+    name: Sunroom Fan State using Modes
+    
+script:
+  sunroom_fan_off_modes:
+    alias: Sunroom Fan Off modes
+    sequence:
+      - service: switch.turn_on
+        entity_id: switch.sunroom_fan_0
+      - service: input_boolean.turn_off
+        data:
+          entity_id: input_boolean.sunroom_fan_state_modes
+      - service: input_select.select_option
+        data:
+          entity_id: input_select.sunroom_fan_modes
+          option: "off"
+        
+  sunroom_fan_on_modes:
+    alias: Sunroom Fan On Modes
+    sequence:
+      - service: input_boolean.turn_on
+        data:
+          entity_id: input_boolean.sunroom_fan_state_modes
+      - service: input_select.select_option
+        data:
+          entity_id: input_select.sunroom_fan_modes
+          option: >
+            {% if is_state("input_select.sunroom_fan_modes", "off") %}
+              low
+            {% else %}
+              {{ states('input_select.sunroom_fan_modes') }}
+            {% endif %}
+      - service_template: >
+          {% if is_state("input_select.sunroom_fan_modes", "low") %}
+            script.sunroom_fan_low
+          {% elif is_state("input_select.sunroom_fan_modes", "medium") %}
+            script.sunroom_fan_med
+          {% elif is_state("input_select.sunroom_fan_modes", "high") %}
+            script.sunroom_fan_high
+          {% endif %}
+          
+  sunroom_fan_set_preset_mode:
+    alias: Sunroom Fan Set Preset Mode
+    sequence:
+      - service: input_select.select_option
+        data:
+          entity_id: input_select.sunroom_fan_modes
+          option: "{{ preset_mode }}"
+      - delay:
+          milliseconds: 500
+      - service: >
+          {% if states('input_select.sunroom_fan_modes') == "off" %}
+            script.sunroom_fan_off_modes
+          {% else %}
+            script.sunroom_fan_on_modes
+          {% endif %}
+  
+  sunroom_fan_low:
+    alias: Sunroom Fan Low
+    sequence:
+      - service: switch.turn_on
+        entity_id:  switch.sunroom_fan_1
+
+  sunroom_fan_med:
+    alias: Sunroom Fan Medium
+    sequence:
+      - service: switch.turn_on
+        entity_id:  switch.sunroom_fan_2
+
+  sunroom_fan_high:
+    alias: Sunroom Fan High
+    sequence:
+      - service: switch.turn_on
+        entity_id:  switch.sunroom_fan_3
+
+switch:
+  - platform: broadlink
+    mac: 34:ea:34:42:f3:be
+    switches:
+      #sunroom_light:
+      - name: "Sunroom Light"
+        command_on: sgB4Ag4MDwsPCw8MDgwPCw8LDwsPDA4MDwsPqRwLHAsPGRwLHAscDBwLHAsPGQ8YHAsdCw8YDxgPGQ8YDxkOGRwLDxkOGRwLDxkcCw8YDxkcCw8YDxkPGBwLHAwcCxwLHAwPGBwLHAwcCw8YHQsPGA8YDxkcCw8ZDhkPGA8ZDxgPGA8ZDhkcCxwMHAsPGBwMHAscCxwMHAscCxwMHAsOAANIDwwPCw8LDwsPCw8MDwsPCw8LDwwPCw+oHQscCw8YHQscCxwMHAscCw8ZDxgcCxwMDxgPGA8ZDxgPGA8ZHAsPGA8ZHAsPGBwMDxgPGBwMDxgPGQ4ZHAscDBwLHAscDA4ZHAscDBwLDxgcDA8YDxgPGRwLDxgPGQ8YDxgPGQ8YDxkOGRwLHAwbDA8YHAwbDBwLHAwbDBwLHAwcCw4AA6YPCw8LDwsPDA4MDwsPCw8MDgwPCw8MDqkcCxwMDhkcCxwMGwwcCxwMDhkPGRsMHAsPGQ4ZDhkPGA8ZDhkcDA4ZDhkcDA4ZHAsPGQ4ZHAsPGQ4ZDhkcDBsMHAscDBsMDxkbDBsMHAwOGRsMDxkOGQ4ZDxgPGQ8YHAwOGQ4ZHAwbDA4ZHAwbDBwLHAwbDBwLDxkbDBsMDxkOGRsMDwADSA4MDgwODA8MDgwODA4MDwwODA4MDgwPqRsMHAwOGRsMHAwbDBsMHAwOGQ4ZHAwbDA4ZDxkOGQ4aDhkOGRsMDxkOGRsMDxkbDA4aDhkbDA4aDhkOGRwMGwwbDBwMGwwOGRwMGwwbDA8ZGwwOGQ8ZDhkOGQ8ZDhkbDA8ZDhkbDBwMDhkbDBwMGwwbDRsMGwwOGhsMGwwOGg4ZGwwOAAXc
+        command_off: sgB4Ag4MDwsPCw8MDgwPCw8LDwsPDA4MDwsPqRwLHAsPGRwLHAscDBwLHAsPGQ8YHAsdCw8YDxgPGQ8YDxkOGRwLDxkOGRwLDxkcCw8YDxkcCw8YDxkPGBwLHAwcCxwLHAwPGBwLHAwcCw8YHQsPGA8YDxkcCw8ZDhkPGA8ZDxgPGA8ZDhkcCxwMHAsPGBwMHAscCxwMHAscCxwMHAsOAANIDwwPCw8LDwsPCw8MDwsPCw8LDwwPCw+oHQscCw8YHQscCxwMHAscCw8ZDxgcCxwMDxgPGA8ZDxgPGA8ZHAsPGA8ZHAsPGBwMDxgPGBwMDxgPGQ4ZHAscDBwLHAscDA4ZHAscDBwLDxgcDA8YDxgPGRwLDxgPGQ8YDxgPGQ8YDxkOGRwLHAwbDA8YHAwbDBwLHAwbDBwLHAwcCw4AA6YPCw8LDwsPDA4MDwsPCw8MDgwPCw8MDqkcCxwMDhkcCxwMGwwcCxwMDhkPGRsMHAsPGQ4ZDhkPGA8ZDhkcDA4ZDhkcDA4ZHAsPGQ4ZHAsPGQ4ZDhkcDBsMHAscDBsMDxkbDBsMHAwOGRsMDxkOGQ4ZDxgPGQ8YHAwOGQ4ZHAwbDA4ZHAwbDBwLHAwbDBwLDxkbDBsMDxkOGRsMDwADSA4MDgwODA8MDgwODA4MDwwODA4MDgwPqRsMHAwOGRsMHAwbDBsMHAwOGQ4ZHAwbDA4ZDxkOGQ4aDhkOGRsMDxkOGRsMDxkbDA4aDhkbDA4aDhkOGRwMGwwbDBwMGwwOGRwMGwwbDA8ZGwwOGQ8ZDhkOGQ8ZDhkbDA8ZDhkbDBwMDhkbDBwMGwwbDRsMGwwOGhsMGwwOGg4ZGwwOAAXc
+      #sunroom_fan_1:
+      - name: "Sunroom Fan 1"
+        command_on: sgA8AQ4MDgwODA8MDgwODA4MDg0ODA4MDgwOqhsMGwwPGRsMHAwbDBsMHAwOGQ4ZHAwbDA4ZDxkOGQ4ZDxkOGRsMDxkOGRsMDxkbDA4aDhkbDA4ZDxkOGRsMHAwbDBwMGwwOGRsNGwwbDA4aGwwOGQ4aDhkOGQ4aDhkOGQ4aDhkOGRwMDhkbDBwMGwwbDBwMGwwbDBwMGwwbDA8ZGwwOAANJDgwODA4MDgwPDA4MDgwODA8MDgwODA6qGwwbDQ0aGwwbDRsMGwwbDQ4ZDhkbDRsMDhkOGg4ZDhkOGg4ZGwwOGg4ZGwwOGhsMDhkOGhsMDhkOGg4ZGwwcDBsMGw0bDA4ZGw0bDBsMDhobDA4ZDhoOGQ4ZDhoOGQ4ZDhoOGQ4ZGw0OGRsMGw0bDBsMGw0bDBsMHAwbDBsMDhobDA4ABdwAAAAAAAAAAAAAAAA=
+        command_off: sgA8AQ4MDgwODA8MDgwODA4MDg0ODA4MDgwOqhsMGwwPGRsMHAwbDBsMHAwOGQ4ZHAwbDA4ZDxkOGQ4ZDxkOGRsMDxkOGRsMDxkbDA4aDhkbDA4ZDxkOGRsMHAwbDBwMGwwOGRsNGwwbDA4aGwwOGQ4aDhkOGQ4aDhkOGQ4aDhkOGRwMDhkbDBwMGwwbDBwMGwwbDBwMGwwbDA8ZGwwOAANJDgwODA4MDgwPDA4MDgwODA8MDgwODA6qGwwbDQ0aGwwbDRsMGwwbDQ4ZDhkbDRsMDhkOGg4ZDhkOGg4ZGwwOGg4ZGwwOGhsMDhkOGhsMDhkOGg4ZGwwcDBsMGw0bDA4ZGw0bDBsMDhobDA4ZDhoOGQ4ZDhoOGQ4ZDhoOGQ4ZGw0OGRsMGw0bDBsMGw0bDBsMHAwbDBsMDhobDA4ABdwAAAAAAAAAAAAAAAA=  
+      #sunroom_fan_2:
+      - name: "Sunroom Fan 2"
+        command_on: sgDaAQ8MDgwODA8LDwsPDA4MDwsPCw8MDgwOqRwMGwwPGBwMHAscCxwMHAsPGA8ZHAscCw8ZDxgPGA8ZDxgPGBwMDhkPGRsMDxgcDA4ZDxgcDA4ZDxgPGRwLHAscDBwLHAsPGRsMHAscDA4ZHAwOGQ8YDxgPGQ8YDxgcDA4ZDxkOGQ8YDxkbDBwLHAwbDBwLHAwOGRwLHAwcCxwLHAwOAANIDwsPCw8MDgwPCw8LDwwODA4MDwsPCw+pHAwbDA8YHAwbDBwLHAwcCw8YDxkcCxwLDxkOGQ8YDxkOGQ8YHAwOGQ8YHAwPGBwLDxkPGBwLDxkPGA8YHAwcCxwLHAwcCw8YHAwcCxwLDxkcCw8ZDhkPGA8ZDhkPGBwMDhkPGA8ZDhkPGBwMHAscCxwMHAscCw8ZHAscCxwMHAscCw8AA0gODA8LDwsPDA4MDwsPCw8MDgwODA8LD6kcCxwMDhkcCxwLHAwcCxwMDhkPGBwMHAsPGA8ZDxgPGA8ZDhkcCw8ZDhkcDA4ZHAsPGQ4ZHAsPGA8ZDxgcDBsMHAscDBsMDhkcDBsMHAsPGRwLDxgPGQ8YDxgPGQ4ZHAsPGQ8YDxgPGQ4ZHAwbDBsMHAscDBwLDxkbDBwLHAscDBwLDwAF3A8ZDxgPGA8ZDxgPGBwM
+        command_off: sgDaAQ8MDgwODA8LDwsPDA4MDwsPCw8MDgwOqRwMGwwPGBwMHAscCxwMHAsPGA8ZHAscCw8ZDxgPGA8ZDxgPGBwMDhkPGRsMDxgcDA4ZDxgcDA4ZDxgPGRwLHAscDBwLHAsPGRsMHAscDA4ZHAwOGQ8YDxgPGQ8YDxgcDA4ZDxkOGQ8YDxkbDBwLHAwbDBwLHAwOGRwLHAwcCxwLHAwOAANIDwsPCw8MDgwPCw8LDwwODA4MDwsPCw+pHAwbDA8YHAwbDBwLHAwcCw8YDxkcCxwLDxkOGQ8YDxkOGQ8YHAwOGQ8YHAwPGBwLDxkPGBwLDxkPGA8YHAwcCxwLHAwcCw8YHAwcCxwLDxkcCw8ZDhkPGA8ZDhkPGBwMDhkPGA8ZDhkPGBwMHAscCxwMHAscCw8ZHAscCxwMHAscCw8AA0gODA8LDwsPDA4MDwsPCw8MDgwODA8LD6kcCxwMDhkcCxwLHAwcCxwMDhkPGBwMHAsPGA8ZDxgPGA8ZDhkcCw8ZDhkcDA4ZHAsPGQ4ZHAsPGA8ZDxgcDBsMHAscDBsMDhkcDBsMHAsPGRwLDxgPGQ8YDxgPGQ4ZHAsPGQ8YDxgPGQ4ZHAwbDBsMHAscDBwLDxkbDBwLHAscDBwLDwAF3A8ZDxgPGA8ZDxgPGBwM
+      #sunroom_fan_3:
+      - name: "Sunroom Fan 3"
+        command_on: sgA8AQ4MDgwODA4NDgwODA4MDg0NDQ4MDgwOqhsMGwwPGRsMGw0bDBsMGw0NGg4ZGw0bDA4ZDhoOGQ4ZDhoOGRsMDhoOGRsMDhobDA4ZDhobDA4ZDxkOGRsNGwwbDBsMHAwOGRsNGwwbDA4aGwwOGQ4aDhkOGQ4aGwwOGQ4aDhkOGQ4aDhkbDBsNGwwbDBsNDhkbDBwMGwwbDBsNGwwOAANJDQ0ODA4MDgwODQ4MDgwODA4NDQ0ODA6qGwwbDA4ZHAwbDBsMHAwbDA4ZDxkbDBsMDxkOGQ4ZDxkOGQ4aGwwOGQ4aGwwOGRwMDhkOGRwMDhkOGQ4aGwwbDBwMGwwbDA8ZGwwbDBwMDhkbDA8ZDhkOGg4ZDhkbDA8ZDhkOGg4ZDhkOGhsMGwwbDRsMGwwOGhsMGwwcDBsMGwwcDA4ABdwAAAAAAAAAAAAAAAA=
+        command_off: sgA8AQ4MDgwODA4NDgwODA4MDg0NDQ4MDgwOqhsMGwwPGRsMGw0bDBsMGw0NGg4ZGw0bDA4ZDhoOGQ4ZDhoOGRsMDhoOGRsMDhobDA4ZDhobDA4ZDxkOGRsNGwwbDBsMHAwOGRsNGwwbDA4aGwwOGQ4aDhkOGQ4aGwwOGQ4aDhkOGQ4aDhkbDBsNGwwbDBsNDhkbDBwMGwwbDBsNGwwOAANJDQ0ODA4MDgwODQ4MDgwODA4NDQ0ODA6qGwwbDA4ZHAwbDBsMHAwbDA4ZDxkbDBsMDxkOGQ4ZDxkOGQ4aGwwOGQ4aGwwOGRwMDhkOGRwMDhkOGQ4aGwwbDBwMGwwbDA8ZGwwbDBwMDhkbDA8ZDhkOGg4ZDhkbDA8ZDhkOGg4ZDhkOGhsMGwwbDRsMGwwOGhsMGwwcDBsMGwwcDA4ABdwAAAAAAAAAAAAAAAA=
+      #sunroom_fan_0:
+      - name: "Sunroom Fan 0"
+        command_on: sgB4Ag4MDgwODQ4MDgwODA4NDQ0ODA4MDgwOqhsMGw0OGRsMGw0bDBsMGw0OGQ4ZGw0bDA4ZDhoOGQ4aDRoOGRsMDhoOGRsMDhobDA4aDhkbDA4aDhkOGRsNGwwbDBsNGwwOGRsNGwwbDA4aGwwOGQ4aDhkOGQ4aDhkOGQ4aDhkOGg0aGwwbDRsMGwwbDRsMGwwbDRsMGwwbDRsMDhkOAANIDwwODA4MDg0NDQ4MDgwODA4NDgwODA6qGwwbDA4ZHAwbDBwMGwwbDA4aDhkbDBwMDhkOGQ4aDhkOGQ8ZGwwOGQ8ZGwwOGhsMDhkOGhsMDhkOGg4ZGwwbDRsMGwwbDQ4ZGwwcDBsMDhobDA4ZDhoNGg4ZDhoOGQ4ZDhoOGQ4ZDhobDBsMGw0bDBsMGw0bDBsMGw0bDBsMGw0OGQ4AA4QODA4MDgwODA8MDgwODA4MDwsPDA4MDqobDBsMDxkbDBsMHAwbDBsMDxkOGRsMHAwOGQ4ZDxkOGQ4ZDxkbDA4aDhkbDA4ZHAwOGQ4aGwwOGQ4aDhkbDBwMGwwbDBwMDhkbDBwMGwwOGRwMDhkOGQ8ZDhkOGQ8ZGwwOGQ8ZDhkbDA8ZGwwbDBwMGwwbDBwMDhkcDBsMGwwOGhsMDgADSA4MDwwODA4MDgwPDA4MDgwODA4MDwwOqRwMGwwOGRwMGwwbDBwMGwwOGQ8ZGwwbDA8ZDhkPGQ4ZDhkPGRsMDhkPGRsMDhkcDA4ZDhobDA4ZDhoOGRsMGw0bDBsMGw0OGRsMGw0bDA4ZGw0OGQ4ZDhoOGQ4ZDxkbDA4ZDxkOGRsNDRobDBsMHAwbDBsNGwwOGRsNGg0bDA4aGwwOAAXc
+        command_off: sgB4Ag4MDgwODQ4MDgwODA4NDQ0ODA4MDgwOqhsMGw0OGRsMGw0bDBsMGw0OGQ4ZGw0bDA4ZDhoOGQ4aDRoOGRsMDhoOGRsMDhobDA4aDhkbDA4aDhkOGRsNGwwbDBsNGwwOGRsNGwwbDA4aGwwOGQ4aDhkOGQ4aDhkOGQ4aDhkOGg0aGwwbDRsMGwwbDRsMGwwbDRsMGwwbDRsMDhkOAANIDwwODA4MDg0NDQ4MDgwODA4NDgwODA6qGwwbDA4ZHAwbDBwMGwwbDA4aDhkbDBwMDhkOGQ4aDhkOGQ8ZGwwOGQ8ZGwwOGhsMDhkOGhsMDhkOGg4ZGwwbDRsMGwwbDQ4ZGwwcDBsMDhobDA4ZDhoNGg4ZDhoOGQ4ZDhoOGQ4ZDhobDBsMGw0bDBsMGw0bDBsMGw0bDBsMGw0OGQ4AA4QODA4MDgwODA8MDgwODA4MDwsPDA4MDqobDBsMDxkbDBsMHAwbDBsMDxkOGRsMHAwOGQ4ZDxkOGQ4ZDxkbDA4aDhkbDA4ZHAwOGQ4aGwwOGQ4aDhkbDBwMGwwbDBwMDhkbDBwMGwwOGRwMDhkOGQ8ZDhkOGQ8ZGwwOGQ8ZDhkbDA8ZGwwbDBwMGwwbDBwMDhkcDBsMGwwOGhsMDgADSA4MDwwODA4MDgwPDA4MDgwODA4MDwwOqRwMGwwOGRwMGwwbDBwMGwwOGQ8ZGwwbDA8ZDhkPGQ4ZDhkPGRsMDhkPGRsMDhkcDA4ZDhobDA4ZDhoOGRsMGw0bDBsMGw0OGRsMGw0bDA4ZGw0OGQ4ZDhoOGQ4ZDxkbDA4ZDxkOGRsNDRobDBsMHAwbDBsNGwwOGRsNGg0bDA4aGwwOAAXc
+
+automation:
+  #- id: Turn_Off_SR_Fan_1_Sw
+  - alias: Toggle Sunroom Fan Low Switch
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id: switch.sunroom_fan_1
+      to: 'on'
+      for:
+        seconds: 1
+    action:
+      service: homeassistant.turn_off
+      entity_id: switch.sunroom_fan_1
+
+  #- id: Turn_Off_SR_Fan_2_Sw
+  - alias: Toggle Sunroom Fan Medium Switch
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id: switch.sunroom_fan_2
+      to: 'on'
+      for:
+        seconds: 1
+    action:
+      service: homeassistant.turn_off
+      entity_id: switch.sunroom_fan_2
+     
+  #- id: Turn_Off_SR_Fan_3_Sw
+  - alias: Toggle Sunroom Fan High Switch
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id: switch.sunroom_fan_3
+      to: 'on'
+      for:
+        seconds: 1
+    action:
+      service: homeassistant.turn_off
+      entity_id: switch.sunroom_fan_3
+    
+  #- id: Turn_Off_SR_Fan_0_Sw
+  - alias: Toggle Sunroom Fan Off Switch
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id: switch.sunroom_fan_0
+      to: 'on'
+      for:
+        seconds: 1
+    action:
+      service: homeassistant.turn_off
+      entity_id: switch.sunroom_fan_0
+      
+homeassistant:
+  customize:
+    switch.sunroom_fan_0:
+      friendly_name: Sunroom Fan Off
+    switch.sunroom_fan_1:
+      friendly_name: Sunroom Fan Low
+    switch.sunroom_fan_2:
+      friendly_name: Sunroom Fan Medium
+    switch.sunroom_fan_3:
+      friendly_name: Sunroom Fan High
