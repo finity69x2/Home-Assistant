@@ -1,0 +1,376 @@
+counter:
+  cpap_toss_turn_count:
+    name: CPAP Sleep Movements Current Count
+
+input_boolean:
+  cpap_indicator:
+    name: CPAP Indicator Main Control
+  cpap_morning_on:
+    name: CPAP Morning Script Running
+  cpap_day_on:
+    name: CPAP Day Script Running
+  cpap_evening_on:
+    name: CPAP Evening Script Running
+  cpap_night_on:
+    name: CPAP Night Script Running
+  cpap_mvmnt_cnt_enable:
+    name: CPAP Movement Counter Enabled
+ 
+    
+input_datetime:
+  cpap_ind_start_time:
+    name: CPAP Indicator Start Time
+    has_date: false
+    has_time: true
+  cpap_ind_off_time:
+    name: CPAP Indicator Off Time
+    has_date: true
+    has_time: true
+  cpap_mvmt_cnt_start_time:
+    name: CPAP Movement Count Start Time
+    has_date: true
+    has_time: true
+  cpap_mvmt_cnt_stop_time:
+    name: CPAP Movement Count Stop Time
+    has_date: true
+    has_time: true
+      
+input_number:
+  cpap_timer_extension_minutes:
+    name: CPAP Timer Extension Minutes
+    min: 0
+    max: 59
+    step: 1
+    mode: box
+  cpap_timer_extension_hours:
+    name: CPAP Timer Extension Hours
+    min: 0
+    max: 11
+    step: 1
+    mode: box
+    
+timer:
+  cpap_timer:
+    duration: '04:15:00'
+    name: 'CPAP Timer'
+        
+variable:
+  cpap_run_time_seconds:
+    value: 15300
+    restore: true
+    attributes:
+      friendly_name: 'CPAP Total Run Time (Seconds)'
+      icon: mdi:clock-outline
+  cpap_extension_time_seconds:
+    value: 0
+    restore: true
+    attributes:
+      friendly_name: 'CPAP Extension Time (Seconds)'
+      icon: mdi:clock-outline
+  cpap_sun_transition_offset_seconds:
+    value: 14400
+    restore: true
+    attributes:
+      friendly_name: 'CPAP Sunrise/Sunset Transition Offset (Seconds)'
+      icon: mdi:clock-outline
+  cpap_sleep_movements_2:
+    value: 0
+    restore: true
+    attributes:
+      friendly_name: 'CPAP Sleep Movements Daily Total'
+     
+automation:
+  - alias: CPAP Set Run Time Variables
+    trigger:
+      - platform: state
+        entity_id:
+          - input_number.cpap_timer_extension_minutes
+          - input_number.cpap_timer_extension_hours
+    action:
+      - service: variable.set_variable
+        data:
+          variable: cpap_run_time_seconds
+          value: "{{ 15300 + (states('input_number.cpap_timer_extension_hours') | int * 3600) + (states('input_number.cpap_timer_extension_minutes') | int * 60) }}"
+      - service: variable.set_variable
+        data:
+          variable: cpap_extension_time_seconds
+          value: "{{ (states('input_number.cpap_timer_extension_hours') | int * 3600) + (states('input_number.cpap_timer_extension_minutes') | int * 60) }}"
+      - service: variable.set_variable
+        data:
+          variable: cpap_sun_transition_offset_seconds
+          value: "{{ 14400 + (states('input_number.cpap_timer_extension_hours') | int * 3600) + (states('input_number.cpap_timer_extension_minutes') | int * 60) }}"
+  
+  - alias: CPAP Indicator Control Toggle with Scene Switch
+    trigger:
+      - platform: event
+        event_type: zwave_js_value_notification
+        event_data:
+          node_id: 35
+          label: Scene 002
+          value: KeyHeldDown
+    action:
+      - service: >
+          {% if is_state('input_boolean.cpap_indicator', 'on') %}
+            input_boolean.turn_off
+          {% else %}
+            input_boolean.turn_on
+          {% endif %}
+        entity_id: input_boolean.cpap_indicator
+            
+  - alias: CPAP Indicator Control Start
+    trigger:
+      - platform: state
+        entity_id: input_boolean.cpap_indicator
+        to: 'on'
+    action:
+      - service: input_datetime.set_datetime
+        entity_id: input_datetime.cpap_ind_start_time
+        data:
+          time: "{{ as_timestamp(now()) | timestamp_custom('%H:%M:%S') }}"
+      - service: input_datetime.set_datetime
+        entity_id: input_datetime.cpap_ind_off_time
+        data:
+          datetime: "{{ (as_timestamp(now()) + 300 + (states('variable.cpap_run_time_seconds') | int )) | timestamp_custom('%Y-%m-%d %H:%M:%S') }}"
+      - service: timer.start
+        data:
+          entity_id: timer.cpap_timer
+          duration: "{{0 ~ (4 + (states('input_number.cpap_timer_extension_hours') | int))}}:{{(15 + (states('input_number.cpap_timer_extension_minutes') | int))}}:00"
+      - service: script.turn_on
+        data:
+          entity_id: >
+            {% if (as_timestamp(state_attr('sun.sun', 'next_rising')) | int - as_timestamp(now()) | int) < (states('variable.cpap_sun_transition_offset_seconds') | int) and is_state('sun.sun','below_horizon') %}
+              script.cpap_morning_transition
+            {% elif is_state('sun.sun','above_horizon') and (as_timestamp(state_attr('sun.sun', 'next_setting')) | int - as_timestamp(now()) | int) > (states('variable.cpap_sun_transition_offset_seconds') | int) %}
+              script.cpap_day
+            {% elif (as_timestamp(state_attr('sun.sun', 'next_setting')) | int - as_timestamp(now()) | int) < (states('variable.cpap_sun_transition_offset_seconds') | int) and is_state('sun.sun','above_horizon') %}
+              script.cpap_evening_transition
+            {% else %}
+              script.cpap_night
+            {% endif %}
+  
+  - alias: CPAP Indicator Control Cancel
+    trigger:
+      - platform: state
+        entity_id: input_boolean.cpap_indicator
+        to: 'off'
+      - platform: template
+        value_template: "{{ states('sensor.date_time') == (state_attr('input_datetime.cpap_ind_off_time', 'timestamp') | int | timestamp_custom('%Y-%m-%d, %H:%M')) }}"
+    action:
+      - service: script.turn_off
+        entity_id:
+          - script.cpap_morning_transition
+          - script.cpap_day
+          - script.cpap_evening_transition
+          - script.cpap_night
+      - service: light.turn_off
+        entity_id: light.mbr_lamp
+      - service: timer.finish
+        entity_id: timer.cpap_timer
+      - service: input_boolean.turn_off
+        entity_id:
+          - input_boolean.cpap_morning_on
+          - input_boolean.cpap_day_on
+          - input_boolean.cpap_evening_on
+          - input_boolean.cpap_night_on
+      - condition: state
+        entity_id: input_boolean.cpap_indicator
+        state: 'on'
+      - service: input_boolean.turn_off
+        entity_id: 
+          - input_boolean.cpap_indicator
+          - input_boolean.cpap_morning_on
+          - input_boolean.cpap_day_on
+          - input_boolean.cpap_evening_on
+          - input_boolean.cpap_night_on
+  
+  - alias: CPAP Indicator Control Restart
+    trigger:
+      - platform: homeassistant
+        event: start
+    condition:
+      - condition: state
+        entity_id: input_boolean.cpap_indicator
+        state: 'on'
+      - condition: template
+        value_template: >
+          {% set time_now = as_timestamp(now()) %}
+          {% set start_time = states('input_datetime.cpap_ind_start_time') %}
+          {% set start_time = as_timestamp(now()) | timestamp_custom('%Y-%m-%d') + ' ' + start_time %}
+          {% set duration = (states('variable.cpap_run_time_seconds') | int) %}
+          {% set end_time = as_timestamp(start_time) + duration %}
+          {{ time_now > as_timestamp(start_time) and time_now < end_time }}
+    action:
+      - service: timer.start
+        data:
+          entity_id: timer.cpap_timer
+          duration: >
+            {% set start = states('input_datetime.cpap_ind_start_time') %} 
+            {% set start = as_timestamp([now().date() | string, start] | join(' ')) %}
+            {% set end = start + (states('variable.cpap_run_time_seconds') | int) %}
+            {{ (end - as_timestamp(now())) | timestamp_custom("%H:%M:00", false) }}
+      - service: script.turn_on
+        data:
+          entity_id: >
+            {% if states('input_boolean.cpap_morning_on', 'on') %}
+              script.cpap_morning_transition
+            {% elif states('input_boolean.cpap_day_on', 'on') %}
+              script.cpap_day
+            {% elif states('input_boolean.cpap_evening_on', 'on') %}
+              script.cpap_evening_transition
+            {% elif states('input_boolean.cpap_night_on', 'on') %}
+              script.cpap_morning_transition
+            {% else %}
+              script.nop
+            {% endif %}
+            
+  - alias: CPAP Movement Counter Set Times
+    trigger:
+      - platform: time
+        at: '09:00:00'
+    action:
+      - service: input_datetime.set_datetime
+        entity_id: input_datetime.cpap_mvmt_cnt_start_time
+        data:
+          datetime: >
+            {% set work_mode = state_attr('calendar.finity69x2gmailcom', 'message') %}
+            {% if work_mode in ['Nights2', 'Nights3', 'Nights4'] %}
+              {{ as_timestamp(now()) | timestamp_custom('%Y-%m-%d') ~ ' ' ~ '10:00:00' }}
+            {% elif work_mode == 'Off5' %}
+              {{ as_timestamp(now()) | timestamp_custom('%Y-%m-%d') ~ ' ' ~ '22:00:00' }}
+            {% else %}
+              {{ as_timestamp(now()) | timestamp_custom('%Y-%m-%d') ~ ' ' ~ '23:00:00' }}
+            {% endif %}
+      - service: input_datetime.set_datetime
+        entity_id: input_datetime.cpap_mvmt_cnt_stop_time
+        data:
+          datetime: >
+            {% set work_mode = state_attr('calendar.finity69x2gmailcom', 'message') %}
+            {% if work_mode in ['Nights2', 'Nights3', 'Nights4'] %}
+              {{ as_timestamp(now()) | timestamp_custom('%Y-%m-%d') ~ ' ' ~ '19:00:00' }}
+            {% elif work_mode == 'Off5' %}
+              {{ (as_timestamp(now()) + 84600) | timestamp_custom('%Y-%m-%d') ~ ' ' ~ '05:00:00' }}
+            {% else %}
+              {{ (as_timestamp(now()) + 84600) | timestamp_custom('%Y-%m-%d') ~ ' ' ~ '08:00:00' }}
+            {% endif %}
+      - service: >
+            {% set work_mode = state_attr('calendar.finity69x2gmailcom', 'message') %}
+            {% if work_mode == 'Nights1' %}
+              input_boolean.turn_off
+            {% elif work_mode == 'Off5' %}
+              input_boolean.turn_on
+            {% else %}
+              input_boolean.turn_on
+            {% endif %}          
+        entity_id: input_boolean.cpap_mvmnt_cnt_enable
+  
+  - alias: CPAP Count Sleep Movements
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.mbr_motion
+        to: 'on'
+    condition:
+      - "{{ as_timestamp(states('input_datetime.cpap_mvmt_cnt_start_time')) < as_timestamp(now()) < as_timestamp(states('input_datetime.cpap_mvmt_cnt_stop_time')) }}"
+      - condition: state
+        entity_id: input_boolean.cpap_mvmnt_cnt_enable
+        state: 'on'
+    action:
+      - service: counter.increment
+        entity_id: counter.cpap_toss_turn_count
+    
+  - alias: CPAP Save and Reset Sleep Movements
+    trigger:
+      - platform: time
+        at: "19:30:00"
+    action:
+      - service: variable.set_variable
+        data:
+          variable: cpap_sleep_movements_2
+          attributes: 
+            history_01: "{{ states('variable.cpap_sleep_movements_2') }}"
+            history_02: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_01') }}"
+            history_03: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_02') }}"
+            history_04: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_03') }}"
+            history_05: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_04') }}"
+            history_06: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_05') }}"
+            history_07: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_06') }}"
+            history_08: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_07') }}"
+            history_09: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_08') }}"
+            history_10: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_09') }}"
+            history_11: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_10') }}"
+            history_12: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_11') }}"
+            history_13: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_12') }}"
+            history_14: "{{ state_attr('variable.cpap_sleep_movements_2', 'history_13') }}"
+      - service: variable.set_variable
+        data:
+          variable: cpap_sleep_movements_2
+          value: >
+            {{ (as_timestamp(now()) - 84600) | timestamp_custom('%m/%d')}} - {{ states('counter.cpap_toss_turn_count') }}
+      - delay: '00:00:10'
+      - service: counter.reset
+        entity_id: counter.cpap_toss_turn_count
+        
+      
+script:
+  cpap_morning_transition:
+    alias: CPAP Morning Transition
+    sequence:
+      - service: input_boolean.turn_on
+        entity_id: input_boolean.cpap_morning_on
+      - wait_template: "{{ is_state('sun.sun','above_horizon') or (states('sensor.date_time') == (state_attr('input_datetime.cpap_ind_off_time', 'timestamp') | int | timestamp_custom('%Y-%m-%d, %H:%M'))) }}"
+      - service: light.turn_on    
+        entity_id: light.mbr_lamp
+        data:
+          brightness: 15
+      - wait_template: "{{ is_state('timer.cpap_timer','idle') or (states('sensor.date_time') == (state_attr('input_datetime.cpap_ind_off_time', 'timestamp') | int | timestamp_custom('%Y-%m-%d, %H:%M'))) }}"
+      - service: light.turn_off   
+        entity_id: light.mbr_lamp
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.cpap_morning_on
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.cpap_indicator
+  
+  cpap_evening_transition:
+    alias: CPAP Evening Transition
+    sequence:
+      - service: input_boolean.turn_on
+        entity_id: input_boolean.cpap_evening_on
+      - service: light.turn_on    
+        entity_id: light.mbr_lamp
+        data:
+          brightness: 15
+      - wait_template: "{{ is_state('sun.sun','below_horizon') or (states('sensor.date_time') == (state_attr('input_datetime.cpap_ind_off_time', 'timestamp') | int | timestamp_custom('%Y-%m-%d, %H:%M'))) }}"
+      - service: light.turn_off    
+        entity_id: light.mbr_lamp
+      - wait_template: "{{ is_state('timer.cpap_timer','idle') or (states('sensor.date_time') == (state_attr('input_datetime.cpap_ind_off_time', 'timestamp') | int | timestamp_custom('%Y-%m-%d, %H:%M')))}}"
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.cpap_evening_on
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.cpap_indicator
+  
+  cpap_day:
+    alias: CPAP Day
+    sequence:
+      - service: input_boolean.turn_on
+        entity_id: input_boolean.cpap_day_on
+      - service: light.turn_on    
+        entity_id: light.mbr_lamp
+        data:
+          brightness: 15
+      - wait_template: "{{ is_state('timer.cpap_timer','idle') or (states('sensor.date_time') == (state_attr('input_datetime.cpap_ind_off_time', 'timestamp') | int | timestamp_custom('%Y-%m-%d, %H:%M'))) }}"
+      - service: light.turn_off
+        entity_id: light.mbr_lamp
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.cpap_day_on
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.cpap_indicator
+  
+  cpap_night:
+    alias: CPAP Night
+    sequence:
+      - service: input_boolean.turn_on
+        entity_id: input_boolean.cpap_night_on
+      - wait_template: "{{ is_state('timer.cpap_timer','idle') or (states('sensor.date_time') == (state_attr('input_datetime.cpap_ind_off_time', 'timestamp') | int | timestamp_custom('%Y-%m-%d, %H:%M'))) }}"
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.cpap_night_on
+      - service: input_boolean.turn_off
+        entity_id: input_boolean.cpap_indicator
