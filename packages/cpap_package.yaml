@@ -232,7 +232,7 @@ automation:
         entity_id: input_datetime.cpap_mvmt_cnt_start_time
         data:
           datetime: >
-            {% set work_mode = state_attr('calendar.finity69x2gmailcom', 'message') %}
+            {% set work_mode = state_attr('calendar.mycalgmailcom', 'message') %}
             {% if work_mode in ['Nights2', 'Nights3', 'Nights4'] %}
               {{ as_timestamp(now()) | timestamp_custom('%Y-%m-%d') ~ ' ' ~ '10:00:00' }}
             {% elif work_mode == 'Off5' %}
@@ -244,7 +244,7 @@ automation:
         entity_id: input_datetime.cpap_mvmt_cnt_stop_time
         data:
           datetime: >
-            {% set work_mode = state_attr('calendar.finity69x2gmailcom', 'message') %}
+            {% set work_mode = state_attr('calendar.mycalgmailcom', 'message') %}
             {% if work_mode in ['Nights2', 'Nights3', 'Nights4'] %}
               {{ as_timestamp(now()) | timestamp_custom('%Y-%m-%d') ~ ' ' ~ '19:00:00' }}
             {% elif work_mode == 'Off5' %}
@@ -253,7 +253,7 @@ automation:
               {{ (as_timestamp(now()) + 84600) | timestamp_custom('%Y-%m-%d') ~ ' ' ~ '08:00:00' }}
             {% endif %}
       - service: >
-            {% set work_mode = state_attr('calendar.finity69x2gmailcom', 'message') %}
+            {% set work_mode = state_attr('calendar.mycalgmailcom', 'message') %}
             {% if work_mode == 'Nights1' %}
               input_boolean.turn_off
             {% elif work_mode == 'Off5' %}
